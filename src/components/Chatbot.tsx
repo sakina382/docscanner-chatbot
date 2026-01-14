@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { getBotResponse } from '../services/openaiService'
+import Markdown from 'react-markdown';
 
 export function Chatbot() {
-  const [messages, setMessages] = useState([
+  const [messages, setMessages] = useState<{ id: number; type: string; text: string | React.ReactElement }[]>([
     { id: 1, type: 'bot', text: 'Hello! I am a chatbot. How can I help you today?' },
     { id: 2, type: 'user', text: 'Hi there!' }
   ]);
   const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const chatBodyRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when messages change
@@ -15,7 +18,7 @@ export function Chatbot() {
     }
   }, [messages]);
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (input.trim()) {
       const newUserMessage = {
@@ -24,17 +27,28 @@ export function Chatbot() {
         text: input
       };
       setMessages([...messages, newUserMessage]);
+      const userInput = input;
       setInput('');
+      setIsLoading(true);
       
-      // Simulate bot response
-      setTimeout(() => {
+      try {
+        const botResponseText = await getBotResponse(userInput);
         const botResponse = {
           id: messages.length + 2,
           type: 'bot',
-          text: 'Thinking...'
+          text: <Markdown>{botResponseText}</Markdown>
         };
         setMessages(prev => [...prev, botResponse]);
-      }, 500);
+      } catch (error) {
+        const errorResponse = {
+          id: messages.length + 2,
+          type: 'bot',
+          text: 'Sorry, I encountered an error. Please try again.'
+        };
+        setMessages(prev => [...prev, errorResponse]);
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -51,7 +65,7 @@ export function Chatbot() {
         {messages.map((message) => (
           <div key={message.id} className={`message ${message.type}-message`}>
             <div className="message-bubble">
-              <p className="message-text">{message.text}</p>
+              <div className="message-text">{message.text}</div>
             </div>
           </div>
         ))}
@@ -67,7 +81,9 @@ export function Chatbot() {
             onChange={(e) => setInput(e.target.value)}
             required
           />
-          <button type="submit" className="send-button">Send</button>      
+          <button type="submit" className="send-button" disabled={isLoading}>
+            {isLoading ? 'Sending...' : 'Send'}
+          </button>      
         </form>
       </div>
     </div>
